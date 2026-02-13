@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.26)
 project(vmprotect_sdk LANGUAGES C VERSION 1.0.0)
-option(VMPROTECT_BUILD_EXAMPLE "Build test app" OFF)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
