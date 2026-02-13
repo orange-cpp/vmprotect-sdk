@@ -1,0 +1,3 @@
+@PACKAGE_INIT@
+include("${CMAKE_CURRENT_LIST_DIR}/vmprotect_sdkTargets.cmake")
+check_required_components(vmprotect_sdk)
