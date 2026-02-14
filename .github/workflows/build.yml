@@ -1,0 +1,145 @@
+name: Build
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+jobs:
+  x86_windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -A Win32
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x86_windows
+          path: |
+            build/Release/*.dll
+            build/Release/*.lib
+
+  x64_windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -A x64
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x64_windows
+          path: |
+            build/Release/*.dll
+            build/Release/*.lib
+
+  arm64_windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -A ARM64
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64_windows
+          path: |
+            build/Release/*.dll
+            build/Release/*.lib
+
+  x64_linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x64_linux
+          path: build/libVMProtectSDK64.so
+
+  arm64_osx:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
+      - name: Build
+        run: cmake --build build
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64_osx
+          path: build/libVMProtectSDKARM64.dylib
+
+  arm_neon_android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake
+          -DANDROID_ABI=armeabi-v7a
+          -DANDROID_ARM_NEON=ON
+          -DANDROID_PLATFORM=android-21
+          -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm_neon_android
+          path: build/libVMProtectSDKARM32.so
+
+  x64_android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake
+          -DANDROID_ABI=x86_64
+          -DANDROID_PLATFORM=android-21
+          -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x64_android
+          path: build/libVMProtectSDK64.so
+
+  arm64_android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake
+          -DANDROID_ABI=arm64-v8a
+          -DANDROID_PLATFORM=android-21
+          -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64_android
+          path: build/libVMProtectSDKARM64.so
