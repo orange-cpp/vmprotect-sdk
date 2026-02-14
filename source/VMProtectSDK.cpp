@@ -1,6 +1,6 @@
 #include <VMProtectSDK.h>
 
-#if defined(VMP_WIN) || defined(_WIN32)
+#if defined(_WIN32) || defined(_WIN64)
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif

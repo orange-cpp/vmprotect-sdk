@@ -40,13 +40,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND (CMAKE_C_COMPILER_ID STREQUAL "GNU" OR
     target_compile_definitions(${PROJECT_NAME} PRIVATE VMP_GNU)
 endif()
 
+if (WIN32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE VMP_WIN)
+endif ()
+
 # Important for proper build/install usage
 target_include_directories(${PROJECT_NAME}
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-
+target_compile_definitions(vmprotect_sdk PRIVATE vmprotect_sdk_EXPORTS)
 set_target_properties(${PROJECT_NAME} PROPERTIES
         OUTPUT_NAME "${PROJECT_VARIANT}"
         CXX_STANDARD 23
