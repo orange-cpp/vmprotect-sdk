@@ -148,17 +148,17 @@ uint32_t g_time_of_start = GetTickCount();
 #define strcmpi strcasecmp
 #define INI_MAX_LINE 1024
 
-size_t strnlen(char* text, size_t maxlen)
+size_t strnlen(char* text, const size_t max_len)
 {
-    auto last = static_cast<const char*>(memchr(text, '\0', maxlen));
-    return last ? static_cast<size_t>(last - text) : maxlen;
+    const auto last = static_cast<const char*>(memchr(text, '\0', max_len));
+    return last ? static_cast<size_t>(last - text) : max_len;
 }
 
 /* Strip whitespace chars off end of given string, in place. Return s. */
 static char* rstrip(char* s)
 {
     char* p = s + strlen(s);
-    while (p > s && isspace((unsigned char)(*--p)))
+    while (p > s && isspace(static_cast<unsigned char>(*--p)))
         *p = '\0';
     return s;
 }
@@ -166,9 +166,9 @@ static char* rstrip(char* s)
 /* Return pointer to first non-whitespace char in given string. */
 static char* lskip(const char* s)
 {
-    while (*s && isspace((unsigned char)(*s)))
+    while (*s && isspace(static_cast<unsigned char>(*s)))
         s++;
-    return (char*)s;
+    return const_cast<char*>(s);
 }
 
 /* Return pointer to first char c or ';' comment in given string, or pointer to
@@ -197,10 +197,7 @@ static int GetPrivateProfileString(const char* section_name, const char* key_nam
         return 0;
 
     char line[INI_MAX_LINE];
-    char* start;
     char* end;
-    char* name;
-    char* value;
     int lineno = 0;
     int res = 0;
     bool section_found = false;
@@ -210,10 +207,10 @@ static int GetPrivateProfileString(const char* section_name, const char* key_nam
     {
         lineno++;
 
-        start = line;
-        if (lineno == 1 && (unsigned char)start[0] == 0xEF &&
-            (unsigned char)start[1] == 0xBB &&
-            (unsigned char)start[2] == 0xBF)
+        char *start = line;
+        if (lineno == 1 && static_cast<unsigned char>(start[0]) == 0xEF &&
+            static_cast<unsigned char>(start[1]) == 0xBB &&
+            static_cast<unsigned char>(start[2]) == 0xBF)
         {
             start += 3;
         }
@@ -247,8 +244,8 @@ static int GetPrivateProfileString(const char* section_name, const char* key_nam
             if (*end == '=' || *end == ':')
             {
                 *end = '\0';
-                name = rstrip(start);
-                value = lskip(end + 1);
+                char *name = rstrip(start);
+                char *value = lskip(end + 1);
                 end = find_char_or_comment(value, '\0');
                 if (*end == ';')
                     *end = '\0';
