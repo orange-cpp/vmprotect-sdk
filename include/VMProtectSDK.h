@@ -1,25 +1,43 @@
 #pragma once
 
-#if defined(__APPLE__) || defined(__unix__)
-#define VMP_IMPORT 
-#define VMP_API
-#define VMP_WCHAR unsigned short
+// Linkage / calling-convention / wchar abstraction
+#if defined(_WIN32) || defined(_WIN64)
+
+// If building static, no import/export decorations
+#if defined(VMP_STATIC)
+#define VMP_IMPORT
+// When building this DLL target (CMake adds vmprotect_sdk_EXPORTS)
+#elif defined(vmprotect_sdk_EXPORTS) || defined(VMP_SDK_EXPORTS)
+#define VMP_IMPORT __declspec(dllexport)
+// When consuming the DLL
 #else
 #define VMP_IMPORT __declspec(dllimport)
+#endif
+
 #define VMP_API __stdcall
 #define VMP_WCHAR wchar_t
-#ifdef _M_IX86
-#elif _M_X64
-#elif _M_ARM64
+
+#if defined(_M_IX86) || defined(_M_X64) || defined(_M_ARM64)
 #else
 #error "Unsupported target architecture"
 #endif
-#endif // __APPLE__ || __unix__
+
+#else
+
+#if defined(__GNUC__) && (__GNUC__ >= 4)
+#define VMP_IMPORT __attribute__((visibility("default")))
+#else
+#define VMP_IMPORT
+#endif
+
+#define VMP_API
+#define VMP_WCHAR unsigned short
+
+#endif // platform
 
 #ifdef __cplusplus
 extern "C"
 {
-
 #endif
 
 // protection
@@ -79,7 +97,7 @@ typedef struct
     VMP_WCHAR wUserName[256]; // user name
     VMP_WCHAR wEMail[256]; // email
     VMProtectDate dtExpire; // date of serial number expiration
-    VMProtectDate dtMaxBuild; // max date of build, that will accept this key
+    VMProtectDate dtMaxBuild; // max date of build that accepts this key
     int bRunningTime; // running time in minutes
     unsigned char nUserDataLength; // length of user data in bUserData
     unsigned char bUserData[255]; // up to 255 bytes of user data

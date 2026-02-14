@@ -1,10 +1,27 @@
 #include <VMProtectSDK.h>
 
-#if defined(__unix__)
+#if defined(VMP_WIN) || defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#include <wchar.h>
+#endif
+
+#if defined(__APPLE__)
+#include <mach/mach_time.h>
+#include <mach-o/dyld.h>
+#endif
+
+#if defined(__unix__) || defined(__linux__)
 #include <sys/time.h>
 #include <unistd.h>
+#endif
+
+#if defined(__linux__)
 #include <linux/limits.h>
 #endif
+
 #include <cctype>
 #include <cstring>
 #include <cstdint>
@@ -13,11 +30,23 @@
 #include <array>
 #include <cstdlib>
 #include <ctime>
+#include <algorithm>
+
+#ifndef _countof
+#define _countof(x) (sizeof(x) / sizeof((x)[0]))
+#endif
+
 #ifdef VMP_GNU
-#define _countof(x) (sizeof(x)/sizeof(x[0]))
+#define strcmpi strcasecmp
+#define INI_MAX_LINE 1024
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 #elif defined(WIN_DRIVER)
+
 void DriverUnload(PDRIVER_OBJECT driver_object)
 {
+    driver_object;
 }
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath)
@@ -26,7 +55,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
     pDriverObject->DriverUnload = DriverUnload;
     return STATUS_SUCCESS;
 }
-#else
+
+#elif defined(VMP_WIN) || defined(_WIN32)
+
 BOOL APIENTRY DllMain(HANDLE hModule, DWORD dwReason, LPVOID lpReserved)
 {
     hModule;
@@ -76,7 +107,7 @@ bool VMP_API VMProtectIsDebuggerPresent(bool)
 #elif defined(WIN_DRIVER)
     return false;
 #else
-    return IsDebuggerPresent() != FALSE;
+    return ::IsDebuggerPresent() != FALSE;
 #endif
 }
 
@@ -117,51 +148,48 @@ int VMP_API VMProtectGetOfflineDeactivationString(const char*, char*, int)
 
 namespace
 {
-#ifdef __APPLE__
+#if defined(__APPLE__)
     unsigned long GetTickCount()
     {
-        const int64_t one_million = 1000 * 1000;
+        constexpr int64_t one_million = 1000 * 1000;
         mach_timebase_info_data_t timebase_info;
         mach_timebase_info(&timebase_info);
 
-        // mach_absolute_time() returns billionth of seconds,
-        // so divide by one million to get milliseconds
-        return static_cast<uint32_t>((mach_absolute_time() * timebase_info.numer) / (
-                                         one_million * timebase_info.denom));
+        // mach_absolute_time() returns platform ticks.
+        // Convert to milliseconds.
+        return static_cast<uint32_t>((mach_absolute_time() * timebase_info.numer) /
+                                     (one_million * timebase_info.denom));
     }
 #endif
 
-#ifdef __unix__
+#if defined(__unix__) || defined(__linux__)
     unsigned long GetTickCount()
     {
-        timeval tv;
+        timeval tv{};
         gettimeofday(&tv, nullptr);
-        return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+        return static_cast<unsigned long>(tv.tv_sec * 1000UL + tv.tv_usec / 1000UL);
     }
 #endif
 
 #ifndef WIN_DRIVER
     bool g_serial_is_correct = false;
     bool g_serial_is_blacklisted = false;
-    uint32_t g_time_of_start = GetTickCount();
+    uint32_t g_time_of_start = static_cast<uint32_t>(GetTickCount());
 #endif
 
 #ifdef VMP_GNU
 
-#define strcmpi strcasecmp
-#define INI_MAX_LINE 1024
-
-    size_t strnlen(char* text, const size_t max_len)
+    size_t strnlen_local(const char* text, const size_t max_len)
     {
-        const auto last = static_cast<const char*>(memchr(text, '\0', max_len));
+        const auto last = static_cast<const char*>(std::memchr(text, '\0', max_len));
         return last ? static_cast<size_t>(last - text) : max_len;
     }
 
     /* Strip whitespace chars off end of given string, in place. Return s. */
     char* rstrip(char* s)
     {
-        char* p = s + strlen(s);
-        while (p > s && isspace(static_cast<unsigned char>(*--p)))
+        char* p = s + std::strlen(s);
+        while (p > s && std::isspace(static_cast<unsigned char>(*--p)))
             *p = '\0';
         return s;
     }
@@ -169,7 +197,7 @@ namespace
     /* Return pointer to first non-whitespace char in given string. */
     char* lskip(const char* s)
     {
-        while (*s && isspace(static_cast<unsigned char>(*s)))
+        while (*s && std::isspace(static_cast<unsigned char>(*s)))
             s++;
         return const_cast<char*>(s);
     }
@@ -182,7 +210,7 @@ namespace
         int was_whitespace = 0;
         while (*s && *s != c && !(was_whitespace && *s == ';'))
         {
-            was_whitespace = isspace(static_cast<unsigned char>(*s));
+            was_whitespace = std::isspace(static_cast<unsigned char>(*s));
             s++;
         }
         return const_cast<char*>(s);
@@ -195,7 +223,7 @@ namespace
         if (!buffer || !size)
             return 0;
 
-        FILE* file = fopen(file_name, "r");
+        FILE* file = std::fopen(file_name, "r");
         if (!file)
             return 0;
 
@@ -206,7 +234,7 @@ namespace
         bool section_found = false;
 
         /* Scan through file line by line */
-        while (fgets(line, INI_MAX_LINE, file) != NULL)
+        while (std::fgets(line, INI_MAX_LINE, file) != nullptr)
         {
             lineno++;
 
@@ -233,7 +261,7 @@ namespace
                     if (section_found)
                         break;
 
-                    section_found = strcmpi(start + 1, section_name) == 0;
+                    section_found = (strcmpi(start + 1, section_name) == 0);
                 }
             }
             else if (section_found && *start && *start != ';')
@@ -256,37 +284,50 @@ namespace
 
                     if (strcmpi(name, key_name) == 0)
                     {
-                        strncpy(buffer, value, size);
-                        res = strnlen(buffer, size);
+                        std::strncpy(buffer, value, size);
+                        if (size > 0)
+                            buffer[size - 1] = '\0';
+                        res = static_cast<int>(strnlen_local(buffer, size));
                         break;
                     }
                 }
             }
         }
 
-        fclose(file);
+        std::fclose(file);
         return res;
     }
 
     bool GetIniValue(const char* value_name, char* buffer, size_t size)
     {
         char file_name[PATH_MAX];
-        file_name[0] = 0;
-        uint32_t name_size = sizeof(file_name);
+        file_name[0] = '\0';
+
 #if defined(__APPLE__)
-        _NSGetExecutablePath(file_name, &name_size);
+        uint32_t name_size = static_cast<uint32_t>(sizeof(file_name));
+        if (_NSGetExecutablePath(file_name, &name_size) != 0)
+        {
+            if (buffer && size)
+                buffer[0] = '\0';
+            return false;
+        }
 #else
-        int sz = readlink("/proc/self/exe", file_name, name_size);
+        const auto cap = static_cast<size_t>(sizeof(file_name));
+        const ssize_t sz = readlink("/proc/self/exe", file_name, cap - 1);
         if (sz > 0)
-            file_name[sz] = 0;
+            file_name[static_cast<size_t>(sz)] = '\0';
 #endif
-        char* p = strrchr(file_name, '/');
+
+        char* p = std::strrchr(file_name, '/');
         if (p)
-            *(p + 1) = 0;
-        strncat(file_name, "VMProtectLicense.ini", sizeof(file_name) - (p - file_name));
+            *(p + 1) = '\0';
+
+        const size_t len = std::strlen(file_name);
+        if (len < sizeof(file_name) - 1)
+            std::strncat(file_name, "VMProtectLicense.ini", sizeof(file_name) - len - 1);
+
         return GetPrivateProfileString("TestLicense", value_name, buffer, size, file_name) != 0;
     }
-
 
     void ConvertUTF8ToUnicode(const uint8_t* src, size_t len, VMP_WCHAR* dest, size_t dest_size)
     {
@@ -295,6 +336,7 @@ namespace
 
         size_t pos = 0;
         size_t dest_pos = 0;
+
         while (pos < len && dest_pos < dest_size)
         {
             constexpr std::array<uint8_t, 5> utf8_limits = {0xC0, 0xE0, 0xF0, 0xF8, 0xFC};
@@ -306,44 +348,69 @@ namespace
                 continue;
             }
 
-            size_t val_len;
-            for (val_len = 0; val_len <= utf8_limits.size(); val_len++)
+            size_t val_len = 0;
+            for (; val_len < utf8_limits.size(); ++val_len)
             {
                 if (b < utf8_limits[val_len])
                     break;
             }
 
-            if (val_len == 0)
+            // Invalid lead byte or unsupported length (>4 bytes)
+            if (val_len == 0 || val_len > 4)
                 continue;
 
             uint32_t value = b - utf8_limits[val_len - 1];
+            bool ok = true;
+
             for (size_t i = 0; i < val_len; i++)
             {
                 if (pos == len)
+                {
+                    ok = false;
                     break;
+                }
                 b = src[pos++];
                 if (b < 0x80 || b >= 0xC0)
+                {
+                    ok = false;
                     break;
+                }
                 value <<= 6;
                 value |= (b - 0x80);
             }
 
+            if (!ok)
+                continue;
+
             if (value < 0x10000)
             {
-                dest[dest_pos++] = static_cast<uint16_t>(value);
+                if (dest_pos < dest_size)
+                    dest[dest_pos++] = static_cast<uint16_t>(value);
             }
             else if (value <= 0x10FFFF)
             {
-                value -= 0x10000;
-                dest[dest_pos++] = static_cast<uint16_t>(0xD800 + (value >> 10));
-                dest[dest_pos++] = static_cast<uint16_t>(0xDC00 + (value & 0x3FF));
+                // Need 2 UTF-16 code units (surrogate pair)
+                if (dest_pos + 1 < dest_size)
+                {
+                    value -= 0x10000;
+                    dest[dest_pos++] = static_cast<uint16_t>(0xD800 + (value >> 10));
+                    dest[dest_pos++] = static_cast<uint16_t>(0xDC00 + (value & 0x3FF));
+                }
             }
         }
 
-        if (dest_pos < dest_size - 1)
+        if (dest_pos == 0)
+        {
+            dest[0] = 0;
+        }
+        else if (dest_pos < dest_size)
+        {
             dest[dest_pos] = 0;
+        }
         else
-            dest[dest_pos - 1] = 0;
+        {
+            dest[dest_size - 1] = 0;
+        }
     }
 
     bool GetIniValue(const char* value_name, VMP_WCHAR* buffer, size_t size)
@@ -351,7 +418,7 @@ namespace
         char value[INI_MAX_LINE];
         if (GetIniValue(value_name, value, sizeof(value)))
         {
-            ConvertUTF8ToUnicode(reinterpret_cast<uint8_t*>(value), strlen(value), buffer, size);
+            ConvertUTF8ToUnicode(reinterpret_cast<const uint8_t*>(value), std::strlen(value), buffer, size);
             return true;
         }
         if (buffer && size)
@@ -360,39 +427,51 @@ namespace
     }
 
 #elif defined(WIN_DRIVER)
+
+// No INI loading in driver mode.
+
 #else
 
     bool GetIniValue(const char* value_name, wchar_t* buffer, size_t size)
     {
-        wchar_t file_name[MAX_PATH];
-        file_name[0] = 0;
-        GetModuleFileNameW(NULL, file_name, _countof(file_name));
-        wchar_t* p = wcsrchr(file_name, L'\\');
+        if (!buffer || size == 0)
+            return false;
+
+        wchar_t file_name[MAX_PATH] = {0};
+        if (::GetModuleFileNameW(nullptr, file_name, static_cast<DWORD>(_countof(file_name))) == 0)
+            return false;
+
+        wchar_t* p = std::wcsrchr(file_name, L'\\');
         if (p)
-            *(p + 1) = 0;
-        wcsncat_s(file_name, L"VMProtectLicense.ini", _countof(file_name));
+            *(p + 1) = L'\0';
+
+        wcscat_s(file_name, _countof(file_name), L"VMProtectLicense.ini");
 
         wchar_t key_name[1024] = {0};
-        MultiByteToWideChar(CP_ACP, 0, value_name, -1, key_name, _countof(key_name));
-        return GetPrivateProfileStringW(L"TestLicense", key_name, L"", buffer, static_cast<DWORD>(size), file_name) !=
-               0;
+        ::MultiByteToWideChar(CP_ACP, 0, value_name, -1, key_name, static_cast<int>(_countof(key_name)));
+
+        return ::GetPrivateProfileStringW(L"TestLicense", key_name, L"", buffer, static_cast<DWORD>(size), file_name)
+               != 0;
     }
 
     bool GetIniValue(const char* value_name, char* buffer, size_t size)
     {
-        wchar_t value[2048];
-        if (GetIniValue(value_name, value, sizeof(value)))
+        if (!buffer || size == 0)
+            return false;
+
+        wchar_t value[2048] = {0};
+        if (GetIniValue(value_name, value, _countof(value)))
         {
-            WideCharToMultiByte(CP_ACP, 0, value, -1, buffer, static_cast<int>(size), NULL, NULL);
+            ::WideCharToMultiByte(CP_ACP, 0, value, -1, buffer, static_cast<int>(size), nullptr, nullptr);
             return true;
         }
-        if (buffer && size)
-            buffer[0] = 0;
+
+        buffer[0] = 0;
         return false;
     }
 
 #endif
-}
+} // namespace
 
 #define MAKEDATE(y, m, d) (DWORD)((y << 16) + (m << 8) + d)
 
@@ -411,11 +490,11 @@ int VMP_API VMProtectGetSerialNumberState()
     char buf[256];
     if (GetIniValue("TimeLimit", buf, std::size(buf)))
     {
-        int running_time = atoi(buf);
+        int running_time = std::atoi(buf);
         if (running_time >= 0 && running_time <= 255)
         {
-            uint32_t dw = GetTickCount();
-            int d = (dw - g_time_of_start) / 1000 / 60; // minutes
+            uint32_t dw = static_cast<uint32_t>(GetTickCount());
+            int d = static_cast<int>((dw - g_time_of_start) / 1000 / 60); // minutes
             if (running_time <= d)
                 res |= SERIAL_STATE_FLAG_RUNNING_TIME_OVER;
         }
@@ -424,21 +503,27 @@ int VMP_API VMProtectGetSerialNumberState()
     if (GetIniValue("ExpDate", buf, sizeof(buf)))
     {
         int y, m, d;
-        if (scanf(buf, "%04d%02d%02d", &y, &m, &d) == 3)
+        if (std::sscanf(buf, "%04d%02d%02d", &y, &m, &d) == 3)
         {
-            uint32_t ini_date = (y << 16) + (static_cast<uint8_t>(m) << 8) + static_cast<uint8_t>(d);
+            uint32_t ini_date =
+                (static_cast<uint32_t>(y) << 16) + (static_cast<uint8_t>(m) << 8) + static_cast<uint8_t>(d);
             uint32_t cur_date;
 #ifdef VMP_GNU
-            time_t rawtime;
-            time(&rawtime);
-            tm local_tm;
-            tm* timeinfo = localtime_r(&rawtime, &local_tm);
-            cur_date = ((timeinfo->tm_year + 1900) << 16) + (static_cast<uint8_t>(timeinfo->tm_mon + 1) << 8) +
-                       static_cast<uint8_t>(timeinfo->tm_mday);
+            std::time_t rawtime;
+            std::time(&rawtime);
+            std::tm local_tm{};
+#if defined(_POSIX_VERSION)
+            std::tm* timeinfo = localtime_r(&rawtime, &local_tm);
 #else
-            SYSTEMTIME st;
-            GetLocalTime(&st);
-            cur_date = (st.wYear << 16) + (static_cast<uint8_t>(st.wMonth) << 8) + static_cast<uint8_t>(st.wDay);
+            std::tm* timeinfo = std::localtime(&rawtime);
+#endif
+            cur_date = (static_cast<uint32_t>(timeinfo->tm_year + 1900) << 16) +
+                       (static_cast<uint8_t>(timeinfo->tm_mon + 1) << 8) + static_cast<uint8_t>(timeinfo->tm_mday);
+#else
+            SYSTEMTIME st{};
+            ::GetLocalTime(&st);
+            cur_date = (static_cast<uint32_t>(st.wYear) << 16) + (static_cast<uint8_t>(st.wMonth) << 8) +
+                       static_cast<uint8_t>(st.wDay);
 #endif
             if (cur_date > ini_date)
                 res |= SERIAL_STATE_FLAG_DATE_EXPIRED;
@@ -448,21 +533,27 @@ int VMP_API VMProtectGetSerialNumberState()
     if (GetIniValue("MaxBuildDate", buf, sizeof(buf)))
     {
         int y, m, d;
-        if (scanf(buf, "%04d%02d%02d", &y, &m, &d) == 3)
+        if (std::sscanf(buf, "%04d%02d%02d", &y, &m, &d) == 3)
         {
-            uint32_t ini_date = (y << 16) + (static_cast<uint8_t>(m) << 8) + static_cast<uint8_t>(d);
+            uint32_t ini_date =
+                (static_cast<uint32_t>(y) << 16) + (static_cast<uint8_t>(m) << 8) + static_cast<uint8_t>(d);
             uint32_t cur_date;
 #ifdef VMP_GNU
-            time_t rawtime;
-            time(&rawtime);
-            tm local_tm;
-            tm* timeinfo = localtime_r(&rawtime, &local_tm);
-            cur_date = ((timeinfo->tm_year + 1900) << 16) + (static_cast<uint8_t>(timeinfo->tm_mon + 1) << 8) +
-                       static_cast<uint8_t>(timeinfo->tm_mday);
+            std::time_t rawtime;
+            std::time(&rawtime);
+            std::tm local_tm{};
+#if defined(_POSIX_VERSION)
+            std::tm* timeinfo = localtime_r(&rawtime, &local_tm);
 #else
-            SYSTEMTIME st;
-            GetLocalTime(&st);
-            cur_date = (st.wYear << 16) + (static_cast<uint8_t>(st.wMonth) << 8) + static_cast<uint8_t>(st.wDay);
+            std::tm* timeinfo = std::localtime(&rawtime);
+#endif
+            cur_date = (static_cast<uint32_t>(timeinfo->tm_year + 1900) << 16) +
+                       (static_cast<uint8_t>(timeinfo->tm_mon + 1) << 8) + static_cast<uint8_t>(timeinfo->tm_mday);
+#else
+            SYSTEMTIME st{};
+            ::GetLocalTime(&st);
+            cur_date = (static_cast<uint32_t>(st.wYear) << 16) + (static_cast<uint8_t>(st.wMonth) << 8) +
+                       static_cast<uint8_t>(st.wDay);
 #endif
             if (cur_date > ini_date)
                 res |= SERIAL_STATE_FLAG_MAX_BUILD_EXPIRED;
@@ -473,7 +564,7 @@ int VMP_API VMProtectGetSerialNumberState()
     {
         char buf2[256];
         GetIniValue("MyHWID", buf2, sizeof(buf2));
-        if (strcmp(buf, buf2) != 0)
+        if (std::strcmp(buf, buf2) != 0)
             res |= SERIAL_STATE_FLAG_BAD_HWID;
     }
 
@@ -498,9 +589,9 @@ int VMP_API VMProtectSetSerialNumber(const char* serial)
     while (*src)
     {
         char c = *src;
-        // check agains base64 alphabet
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '+' || c == '/' || c ==
-            '=')
+        // check against base64 alphabet
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '+' || c == '/' ||
+            c == '=')
             *dst++ = c;
         src++;
     }
@@ -508,11 +599,11 @@ int VMP_API VMProtectSetSerialNumber(const char* serial)
 
     char ini_serial[2048];
     if (!GetIniValue("AcceptedSerialNumber", ini_serial, sizeof(ini_serial)))
-        strcpy(ini_serial, "serialnumber");
-    g_serial_is_correct = strcmp(buf_serial, ini_serial) == 0;
+        std::strcpy(ini_serial, "serialnumber");
+    g_serial_is_correct = std::strcmp(buf_serial, ini_serial) == 0;
 
     if (GetIniValue("BlackListedSerialNumber", ini_serial, sizeof(ini_serial)))
-        g_serial_is_blacklisted = strcmp(buf_serial, ini_serial) == 0;
+        g_serial_is_blacklisted = std::strcmp(buf_serial, ini_serial) == 0;
 
     return VMProtectGetSerialNumberState();
 #endif
@@ -525,9 +616,9 @@ bool VMP_API VMProtectGetSerialNumberData(VMProtectSerialNumberData* data, int s
     size;
     return false;
 #else
-    if (size != sizeof(VMProtectSerialNumberData))
+    if (!data || size != static_cast<int>(sizeof(VMProtectSerialNumberData)))
         return false;
-    memset(data, 0, sizeof(VMProtectSerialNumberData));
+    std::memset(data, 0, sizeof(VMProtectSerialNumberData));
 
     data->nState = VMProtectGetSerialNumberState();
     if (data->nState & (SERIAL_STATE_FLAG_INVALID | SERIAL_STATE_FLAG_BLACKLISTED))
@@ -539,7 +630,7 @@ bool VMP_API VMProtectGetSerialNumberData(VMProtectSerialNumberData* data, int s
     char buf[2048];
     if (GetIniValue("TimeLimit", buf, sizeof(buf)))
     {
-        int running_time = atoi(buf);
+        int running_time = std::atoi(buf);
         if (running_time < 0)
             running_time = 0;
         else if (running_time > 255)
@@ -550,7 +641,7 @@ bool VMP_API VMProtectGetSerialNumberData(VMProtectSerialNumberData* data, int s
     if (GetIniValue("ExpDate", buf, sizeof(buf)))
     {
         int y, m, d;
-        if (scanf(buf, "%04d%02d%02d", &y, &m, &d) == 3)
+        if (std::sscanf(buf, "%04d%02d%02d", &y, &m, &d) == 3)
         {
             data->dtExpire.wYear = static_cast<unsigned short>(y);
             data->dtExpire.bMonth = static_cast<unsigned char>(m);
@@ -561,7 +652,7 @@ bool VMP_API VMProtectGetSerialNumberData(VMProtectSerialNumberData* data, int s
     if (GetIniValue("MaxBuildDate", buf, sizeof(buf)))
     {
         int y, m, d;
-        if (scanf(buf, "%04d%02d%02d", &y, &m, &d) == 3)
+        if (std::sscanf(buf, "%04d%02d%02d", &y, &m, &d) == 3)
         {
             data->dtMaxBuild.wYear = static_cast<unsigned short>(y);
             data->dtMaxBuild.bMonth = static_cast<unsigned char>(m);
@@ -571,13 +662,13 @@ bool VMP_API VMProtectGetSerialNumberData(VMProtectSerialNumberData* data, int s
 
     if (GetIniValue("UserData", buf, sizeof(buf)))
     {
-        size_t len = strlen(buf);
+        const size_t len = std::strlen(buf);
         if (len > 0 && len % 2 == 0 && len <= 255 * 2) // otherwise UserData is empty or has bad length
         {
             for (size_t src = 0, dst = 0; src < len; src++)
             {
                 int v = 0;
-                char c = buf[src];
+                const char c = buf[src];
 
                 if (c >= '0' && c <= '9')
                     v = c - '0';
@@ -588,7 +679,7 @@ bool VMP_API VMProtectGetSerialNumberData(VMProtectSerialNumberData* data, int s
                 else
                 {
                     data->nUserDataLength = 0;
-                    memset(data->bUserData, 0, sizeof(data->bUserData));
+                    std::memset(data->bUserData, 0, sizeof(data->bUserData));
                     break;
                 }
 
@@ -598,7 +689,7 @@ bool VMP_API VMProtectGetSerialNumberData(VMProtectSerialNumberData* data, int s
                 }
                 else
                 {
-                    data->bUserData[dst] |= v;
+                    data->bUserData[dst] |= static_cast<unsigned char>(v);
                     dst++;
                     data->nUserDataLength = static_cast<unsigned char>(dst);
                 }
@@ -617,19 +708,19 @@ int VMP_API VMProtectGetCurrentHWID(char* hwid, int size)
     size;
     return 0;
 #else
-    if (hwid && size == 0)
+    if (hwid && size <= 0)
         return 0;
 
     char buf[1024];
     if (!GetIniValue("MyHWID", buf, sizeof(buf)))
-        scanf(buf, "myhwid");
+        std::strcpy(buf, "myhwid");
 
-    int res = static_cast<int>(strlen(buf));
-    if (hwid)
+    int res = static_cast<int>(std::strlen(buf));
+    if (hwid && size > 0)
     {
         if (size - 1 < res)
             res = size - 1;
-        memcpy(hwid, buf, res);
+        std::memcpy(hwid, buf, static_cast<size_t>(res));
         hwid[res] = 0;
     }
     return res + 1;
@@ -646,21 +737,23 @@ int VMP_API VMProtectActivateLicense(const char* code, char* serial, int size)
 #else
     if (!code)
         return ACTIVATION_BAD_CODE;
+    if (!serial || size <= 0)
+        return ACTIVATION_SMALL_BUFFER;
 
     char buf[2048];
     if (!GetIniValue("AcceptedActivationCode", buf, sizeof(buf)))
-        strcpy(buf, "activationcode");
-    if (strcmp(code, buf) != 0)
+        std::strcpy(buf, "activationcode");
+    if (std::strcmp(code, buf) != 0)
         return ACTIVATION_BAD_CODE;
 
     if (!GetIniValue("AcceptedSerialNumber", buf, sizeof(buf)))
-        strcpy(buf, "serialnumber");
+        std::strcpy(buf, "serialnumber");
 
-    int need = static_cast<int>(strlen(buf));
+    int need = static_cast<int>(std::strlen(buf));
     if (need > size - 1)
         return ACTIVATION_SMALL_BUFFER;
 
-    strcpy(serial, buf);
+    std::strcpy(serial, buf);
     return ACTIVATION_OK;
 #endif
 }
