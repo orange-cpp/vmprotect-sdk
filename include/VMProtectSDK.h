@@ -23,17 +23,17 @@ extern "C"
 #endif
 
 // protection
-VMP_IMPORT void VMP_API VMProtectBegin(const char *);
+VMP_IMPORT void VMP_API VMProtectBegin(const char*);
 
-VMP_IMPORT void VMP_API VMProtectBeginVirtualization(const char *);
+VMP_IMPORT void VMP_API VMProtectBeginVirtualization(const char*);
 
-VMP_IMPORT void VMP_API VMProtectBeginMutation(const char *);
+VMP_IMPORT void VMP_API VMProtectBeginMutation(const char*);
 
-VMP_IMPORT void VMP_API VMProtectBeginUltra(const char *);
+VMP_IMPORT void VMP_API VMProtectBeginUltra(const char*);
 
-VMP_IMPORT void VMP_API VMProtectBeginVirtualizationLockByKey(const char *);
+VMP_IMPORT void VMP_API VMProtectBeginVirtualizationLockByKey(const char*);
 
-VMP_IMPORT void VMP_API VMProtectBeginUltraLockByKey(const char *);
+VMP_IMPORT void VMP_API VMProtectBeginUltraLockByKey(const char*);
 
 VMP_IMPORT void VMP_API VMProtectEnd(void);
 
@@ -46,14 +46,15 @@ VMP_IMPORT bool VMP_API VMProtectIsVirtualMachinePresent(void);
 
 VMP_IMPORT bool VMP_API VMProtectIsValidImageCRC(void);
 
-VMP_IMPORT const char * VMP_API VMProtectDecryptStringA(const char *value);
+VMP_IMPORT const char* VMP_API VMProtectDecryptStringA(const char* value);
 
-VMP_IMPORT const VMP_WCHAR * VMP_API VMProtectDecryptStringW(const VMP_WCHAR *value);
+VMP_IMPORT const VMP_WCHAR* VMP_API VMProtectDecryptStringW(const VMP_WCHAR* value);
 
-VMP_IMPORT bool VMP_API VMProtectFreeString(const void *value);
+VMP_IMPORT bool VMP_API VMProtectFreeString(const void* value);
 
 // licensing
-enum VMProtectSerialStateFlags {
+enum VMProtectSerialStateFlags
+{
     SERIAL_STATE_SUCCESS = 0,
     SERIAL_STATE_FLAG_CORRUPTED = 0x00000001,
     SERIAL_STATE_FLAG_INVALID = 0x00000002,
@@ -65,13 +66,15 @@ enum VMProtectSerialStateFlags {
 };
 
 #pragma pack(push, 1)
-typedef struct {
+typedef struct
+{
     unsigned short wYear;
     unsigned char bMonth;
     unsigned char bDay;
 } VMProtectDate;
 
-typedef struct {
+typedef struct
+{
     int nState; // VMProtectSerialStateFlags
     VMP_WCHAR wUserName[256]; // user name
     VMP_WCHAR wEMail[256]; // email
@@ -83,16 +86,17 @@ typedef struct {
 } VMProtectSerialNumberData;
 #pragma pack(pop)
 
-VMP_IMPORT int VMP_API VMProtectSetSerialNumber(const char *serial);
+VMP_IMPORT int VMP_API VMProtectSetSerialNumber(const char* serial);
 
 VMP_IMPORT int VMP_API VMProtectGetSerialNumberState();
 
-VMP_IMPORT bool VMP_API VMProtectGetSerialNumberData(VMProtectSerialNumberData *data, int size);
+VMP_IMPORT bool VMP_API VMProtectGetSerialNumberData(VMProtectSerialNumberData* data, int size);
 
-VMP_IMPORT int VMP_API VMProtectGetCurrentHWID(char *hwid, int size);
+VMP_IMPORT int VMP_API VMProtectGetCurrentHWID(char* hwid, int size);
 
 // activation
-enum VMProtectActivationFlags {
+enum VMProtectActivationFlags
+{
     ACTIVATION_OK = 0,
     ACTIVATION_SMALL_BUFFER,
     ACTIVATION_NO_CONNECTION,
@@ -106,13 +110,13 @@ enum VMProtectActivationFlags {
     ACTIVATION_NOT_AVAILABLE
 };
 
-VMP_IMPORT int VMP_API VMProtectActivateLicense(const char *code, char *serial, int size);
+VMP_IMPORT int VMP_API VMProtectActivateLicense(const char* code, char* serial, int size);
 
-VMP_IMPORT int VMP_API VMProtectDeactivateLicense(const char *serial);
+VMP_IMPORT int VMP_API VMProtectDeactivateLicense(const char* serial);
 
-VMP_IMPORT int VMP_API VMProtectGetOfflineActivationString(const char *code, char *buf, int size);
+VMP_IMPORT int VMP_API VMProtectGetOfflineActivationString(const char* code, char* buf, int size);
 
-VMP_IMPORT int VMP_API VMProtectGetOfflineDeactivationString(const char *serial, char *buf, int size);
+VMP_IMPORT int VMP_API VMProtectGetOfflineDeactivationString(const char* serial, char* buf, int size);
 
 #ifdef __cplusplus
 }

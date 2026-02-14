@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.26)
-project(vmprotect_sdk LANGUAGES C VERSION 1.0.0)
+project(vmprotect_sdk LANGUAGES C CXX VERSION 1.0.0)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 # Normalize processor string for matching
 string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _proc)
+
 
 # Determine 32/64 from target pointer size
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -32,8 +33,12 @@ message(STATUS "Project variant: ${PROJECT_VARIANT}")
 
 add_library(${PROJECT_NAME} SHARED
         include/VMProtectSDK.h
-        source/VMProtectSDK.c
+        source/VMProtectSDK.cpp
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND (CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang"))
+    target_compile_definitions(${PROJECT_NAME} PRIVATE VMP_GNU)
+endif()
 
 # Important for proper build/install usage
 target_include_directories(${PROJECT_NAME}
