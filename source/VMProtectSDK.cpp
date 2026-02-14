@@ -164,11 +164,6 @@ namespace
         gettimeofday(&tv, nullptr);
         return static_cast<unsigned long>(tv.tv_sec * 1000UL + tv.tv_usec / 1000UL);
     }
-#elif defined(_WIN32) || defined(_WIN64)
-    unsigned long GetTickCount()
-    {
-        return ::GetTickCount();
-    }
 #endif
 
 #ifndef WIN_DRIVER
