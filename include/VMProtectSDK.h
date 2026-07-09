@@ -53,6 +53,18 @@ VMP_IMPORT void VMP_API VMProtectBeginVirtualizationLockByKey(const char*);
 
 VMP_IMPORT void VMP_API VMProtectBeginUltraLockByKey(const char*);
 
+VMP_IMPORT void VMP_API VMProtectFunction(void);
+
+VMP_IMPORT void VMP_API VMProtectFunctionVirtualization(void);
+
+VMP_IMPORT void VMP_API VMProtectFunctionMutation(void);
+
+VMP_IMPORT void VMP_API VMProtectFunctionUltra(void);
+
+VMP_IMPORT void VMP_API VMProtectFunctionVirtualizationLockByKey(void);
+
+VMP_IMPORT void VMP_API VMProtectFunctionUltraLockByKey(void);
+
 VMP_IMPORT void VMP_API VMProtectEnd(void);
 
 // utils

@@ -100,6 +100,24 @@ void VMP_API VMProtectBeginVirtualizationLockByKey(const char*)
 void VMP_API VMProtectBeginUltraLockByKey(const char*)
 {
 }
+void VMP_API VMProtectFunction()
+{
+}
+void VMP_API VMProtectFunctionVirtualization()
+{
+}
+void VMP_API VMProtectFunctionMutation()
+{
+}
+void VMP_API VMProtectFunctionUltra()
+{
+}
+void VMP_API VMProtectFunctionVirtualizationLockByKey()
+{
+}
+void VMP_API VMProtectFunctionUltraLockByKey()
+{
+}
 void VMP_API VMProtectEnd()
 {
 }
